@@ -57,14 +57,13 @@ public class AuthService {
     private UserStatus getInitialStatus(RegisterRequest request) {
 
         return switch (request.getRole()) {
-
             case PATIENT -> UserStatus.ACTIVE;
 
             case DOCTOR,
+                 HOSPITAL,
                  PHARMACY,
-                 AMBULANCE -> UserStatus.PENDING;
-
-            case ADMIN -> UserStatus.PENDING;
+                 AMBULANCE,
+                 ADMIN -> UserStatus.PENDING;
         };
     }
     public LoginResponse login(LoginRequest request) {
