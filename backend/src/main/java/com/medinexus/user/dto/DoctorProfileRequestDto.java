@@ -19,4 +19,8 @@ public class DoctorProfileRequestDto {
 
     @NotNull(message = "Consultation fee is required")
     private Double consultationFee;
+
+    private String qualification;
+
+    private String bio;
 }

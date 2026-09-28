@@ -3,6 +3,7 @@ package com.medinexus.medicine.service;
 import com.medinexus.medicine.dto.MedicineOrderRequestDto;
 import com.medinexus.medicine.dto.MedicineOrderResponseDto;
 import com.medinexus.medicine.dto.OrderItemResponseDto;
+import com.medinexus.medicine.dto.OrderMedicineDto;
 import com.medinexus.medicine.entity.MedicineOrder;
 import com.medinexus.medicine.entity.MedicineOrderStatus;
 import com.medinexus.medicine.entity.OrderItem;
@@ -15,6 +16,7 @@ import com.medinexus.prescription.repository.PrescriptionItemRepository;
 import com.medinexus.prescription.repository.PrescriptionRepository;
 
 import com.medinexus.pharmacy.entity.PharmacyInventory;
+import com.medinexus.user.entity.PharmacyProfile;
 import com.medinexus.pharmacy.repository.PharmacyInventoryRepository;
 
 import com.medinexus.user.entity.*;
@@ -48,7 +50,6 @@ public class MedicineOrderService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
 
-
     // ============================================================
     // CONSTRUCTOR
     // ============================================================
@@ -80,7 +81,6 @@ public class MedicineOrderService {
         this.notificationService = notificationService;
     }
 
-
     // ============================================================
     // PATIENT CREATES ORDER
     // ============================================================
@@ -91,10 +91,6 @@ public class MedicineOrderService {
             MedicineOrderRequestDto dto
     ) {
 
-        // --------------------------------------------------------
-        // 1. Find patient user
-        // --------------------------------------------------------
-
         User user =
                 userRepository.findById(patientUserId)
                         .orElseThrow(() ->
@@ -103,22 +99,12 @@ public class MedicineOrderService {
                                 )
                         );
 
-
-        // --------------------------------------------------------
-        // 2. Check logged-in user is PATIENT
-        // --------------------------------------------------------
-
         if (user.getRole() != Role.PATIENT) {
 
             throw new RuntimeException(
                     "Only patients can place medicine orders"
             );
         }
-
-
-        // --------------------------------------------------------
-        // 3. Find patient profile
-        // --------------------------------------------------------
 
         PatientProfile patient =
                 patientProfileRepository.findById(patientUserId)
@@ -127,11 +113,6 @@ public class MedicineOrderService {
                                         "Patient profile not found"
                                 )
                         );
-
-
-        // --------------------------------------------------------
-        // 4. Find pharmacy
-        // --------------------------------------------------------
 
         PharmacyProfile pharmacy =
                 pharmacyProfileRepository.findById(
@@ -143,11 +124,6 @@ public class MedicineOrderService {
                                 )
                         );
 
-
-        // --------------------------------------------------------
-        // 5. Pharmacy must be VERIFIED
-        // --------------------------------------------------------
-
         if (pharmacy.getVerificationStatus()
                 != VerificationStatus.VERIFIED) {
 
@@ -155,11 +131,6 @@ public class MedicineOrderService {
                     "This pharmacy is not verified"
             );
         }
-
-
-        // --------------------------------------------------------
-        // 6. Find prescription if provided
-        // --------------------------------------------------------
 
         Prescription prescription = null;
 
@@ -175,18 +146,12 @@ public class MedicineOrderService {
                                     )
                             );
 
-
-            // ----------------------------------------------------
-            // 7. Prescription must belong to patient
-            // ----------------------------------------------------
-
             Long prescriptionPatientId =
                     prescription
                             .getConsultation()
                             .getAppointment()
                             .getPatient()
                             .getId();
-
 
             if (!prescriptionPatientId.equals(patientUserId)) {
 
@@ -195,11 +160,6 @@ public class MedicineOrderService {
                 );
             }
         }
-
-
-        // --------------------------------------------------------
-        // 8. Create order
-        // --------------------------------------------------------
 
         MedicineOrder order =
                 new MedicineOrder();
@@ -211,14 +171,8 @@ public class MedicineOrderService {
                 MedicineOrderStatus.PLACED
         );
 
-
         MedicineOrder savedOrder =
                 medicineOrderRepository.save(order);
-
-
-        // --------------------------------------------------------
-        // 9. Add prescription medicines
-        // --------------------------------------------------------
 
         if (prescription != null) {
 
@@ -226,14 +180,12 @@ public class MedicineOrderService {
                     prescriptionItemRepository
                             .findByPrescription(prescription);
 
-
             if (prescriptionItems.isEmpty()) {
 
                 throw new RuntimeException(
                         "Prescription does not contain any medicines"
                 );
             }
-
 
             for (PrescriptionItem prescriptionItem :
                     prescriptionItems) {
@@ -246,11 +198,6 @@ public class MedicineOrderService {
             }
         }
 
-
-        // --------------------------------------------------------
-        // 10. Notify pharmacy about new order
-        // --------------------------------------------------------
-
         notificationService.createNotification(
                 pharmacy.getUser().getId(),
                 "New Medicine Order",
@@ -258,10 +205,8 @@ public class MedicineOrderService {
                 NotificationType.MEDICINE_ORDER
         );
 
-
         return mapToResponseDto(savedOrder);
     }
-
 
     // ============================================================
     // ADD MEDICINE FROM PHARMACY INVENTORY
@@ -272,10 +217,6 @@ public class MedicineOrderService {
             PharmacyProfile pharmacy,
             PrescriptionItem prescriptionItem
     ) {
-
-        // --------------------------------------------------------
-        // Find inventory record
-        // --------------------------------------------------------
 
         PharmacyInventory inventory =
                 pharmacyInventoryRepository
@@ -293,11 +234,6 @@ public class MedicineOrderService {
                                 )
                         );
 
-
-        // --------------------------------------------------------
-        // Check availability
-        // --------------------------------------------------------
-
         if (!Boolean.TRUE.equals(
                 inventory.getAvailable()
         )) {
@@ -309,20 +245,8 @@ public class MedicineOrderService {
             );
         }
 
-
-        // --------------------------------------------------------
-        // Quantity
-        //
-        // Use the quantity prescribed by the doctor.
-        // --------------------------------------------------------
-
         Integer requiredQuantity =
                 prescriptionItem.getQuantity();
-
-
-        // --------------------------------------------------------
-        // Safety check
-        // --------------------------------------------------------
 
         if (requiredQuantity == null || requiredQuantity <= 0) {
 
@@ -331,11 +255,6 @@ public class MedicineOrderService {
                             + inventory.getMedicine().getName()
             );
         }
-
-
-        // --------------------------------------------------------
-        // Check stock
-        // --------------------------------------------------------
 
         if (inventory.getStockQuantity()
                 < requiredQuantity) {
@@ -347,11 +266,6 @@ public class MedicineOrderService {
                             + inventory.getStockQuantity()
             );
         }
-
-
-        // --------------------------------------------------------
-        // Create order item
-        // --------------------------------------------------------
 
         OrderItem orderItem =
                 new OrderItem();
@@ -366,41 +280,26 @@ public class MedicineOrderService {
                 requiredQuantity
         );
 
-
-        // Price comes from pharmacy inventory
-
         orderItem.setPrice(
                 inventory.getPrice()
         );
 
-
         orderItemRepository.save(orderItem);
-
-
-        // --------------------------------------------------------
-        // Reduce pharmacy stock
-        // --------------------------------------------------------
 
         int remainingStock =
                 inventory.getStockQuantity()
                         - requiredQuantity;
 
-
         inventory.setStockQuantity(
                 remainingStock
         );
-
-
-        // Automatically update availability
 
         inventory.setAvailable(
                 remainingStock > 0
         );
 
-
         pharmacyInventoryRepository.save(inventory);
     }
-
 
     // ============================================================
     // GET PATIENT ORDERS
@@ -419,14 +318,12 @@ public class MedicineOrderService {
                                 )
                         );
 
-
         return medicineOrderRepository
                 .findByPatient(patient)
                 .stream()
                 .map(this::mapToResponseDto)
                 .collect(Collectors.toList());
     }
-
 
     // ============================================================
     // GET PHARMACY ORDERS
@@ -445,7 +342,6 @@ public class MedicineOrderService {
                                 )
                         );
 
-
         return medicineOrderRepository
                 .findByPharmacy(pharmacy)
                 .stream()
@@ -453,22 +349,51 @@ public class MedicineOrderService {
                 .collect(Collectors.toList());
     }
 
-
     // ============================================================
     // GET ORDER BY ID
     // ============================================================
 
     @Transactional(readOnly = true)
     public MedicineOrderResponseDto getOrderById(
-            Long orderId
+            Long orderId,
+            Long userId,
+            Role role
     ) {
 
         MedicineOrder order =
                 getOrder(orderId);
 
+        if (role == Role.ADMIN) {
+            return mapToResponseDto(order);
+        }
+
+        if (role == Role.PATIENT &&
+                !order.getPatient().getId().equals(userId)) {
+
+            throw new RuntimeException(
+                    "You are not allowed to view this order"
+            );
+        }
+
+        if (role == Role.PHARMACY &&
+                !order.getPharmacy().getId().equals(userId)) {
+
+            throw new RuntimeException(
+                    "You are not allowed to view this order"
+            );
+        }
+
+        if (role != Role.ADMIN &&
+                role != Role.PATIENT &&
+                role != Role.PHARMACY) {
+
+            throw new RuntimeException(
+                    "You are not allowed to view this order"
+            );
+        }
+
         return mapToResponseDto(order);
     }
-
 
     // ============================================================
     // PHARMACY ACCEPTS ORDER
@@ -483,12 +408,10 @@ public class MedicineOrderService {
         MedicineOrder order =
                 getOrder(orderId);
 
-
         checkPharmacyAccess(
                 order,
                 pharmacyUserId
         );
-
 
         if (order.getStatus()
                 != MedicineOrderStatus.PLACED) {
@@ -498,21 +421,12 @@ public class MedicineOrderService {
             );
         }
 
-
-        // Change status
-
         order.setStatus(
                 MedicineOrderStatus.ACCEPTED
         );
 
-
         MedicineOrder savedOrder =
                 medicineOrderRepository.save(order);
-
-
-        // --------------------------------------------------------
-        // Notify patient
-        // --------------------------------------------------------
 
         notificationService.createNotification(
                 order.getPatient().getId(),
@@ -522,10 +436,8 @@ public class MedicineOrderService {
                 NotificationType.MEDICINE_ORDER
         );
 
-
         return mapToResponseDto(savedOrder);
     }
-
 
     // ============================================================
     // PHARMACY STARTS PROCESSING
@@ -540,12 +452,10 @@ public class MedicineOrderService {
         MedicineOrder order =
                 getOrder(orderId);
 
-
         checkPharmacyAccess(
                 order,
                 pharmacyUserId
         );
-
 
         if (order.getStatus()
                 != MedicineOrderStatus.ACCEPTED) {
@@ -555,21 +465,12 @@ public class MedicineOrderService {
             );
         }
 
-
-        // Change status
-
         order.setStatus(
                 MedicineOrderStatus.PROCESSING
         );
 
-
         MedicineOrder savedOrder =
                 medicineOrderRepository.save(order);
-
-
-        // --------------------------------------------------------
-        // Notify patient
-        // --------------------------------------------------------
 
         notificationService.createNotification(
                 order.getPatient().getId(),
@@ -579,10 +480,8 @@ public class MedicineOrderService {
                 NotificationType.MEDICINE_ORDER
         );
 
-
         return mapToResponseDto(savedOrder);
     }
-
 
     // ============================================================
     // PHARMACY MARKS ORDER READY
@@ -597,12 +496,10 @@ public class MedicineOrderService {
         MedicineOrder order =
                 getOrder(orderId);
 
-
         checkPharmacyAccess(
                 order,
                 pharmacyUserId
         );
-
 
         if (order.getStatus()
                 != MedicineOrderStatus.PROCESSING) {
@@ -612,21 +509,12 @@ public class MedicineOrderService {
             );
         }
 
-
-        // Change status
-
         order.setStatus(
                 MedicineOrderStatus.READY
         );
 
-
         MedicineOrder savedOrder =
                 medicineOrderRepository.save(order);
-
-
-        // --------------------------------------------------------
-        // Notify patient
-        // --------------------------------------------------------
 
         notificationService.createNotification(
                 order.getPatient().getId(),
@@ -636,10 +524,8 @@ public class MedicineOrderService {
                 NotificationType.MEDICINE_ORDER
         );
 
-
         return mapToResponseDto(savedOrder);
     }
-
 
     // ============================================================
     // COMPLETE ORDER
@@ -654,12 +540,10 @@ public class MedicineOrderService {
         MedicineOrder order =
                 getOrder(orderId);
 
-
         checkPharmacyAccess(
                 order,
                 pharmacyUserId
         );
-
 
         if (order.getStatus()
                 != MedicineOrderStatus.READY) {
@@ -669,21 +553,12 @@ public class MedicineOrderService {
             );
         }
 
-
-        // Change status
-
         order.setStatus(
                 MedicineOrderStatus.COMPLETED
         );
 
-
         MedicineOrder savedOrder =
                 medicineOrderRepository.save(order);
-
-
-        // --------------------------------------------------------
-        // Notify patient
-        // --------------------------------------------------------
 
         notificationService.createNotification(
                 order.getPatient().getId(),
@@ -693,10 +568,8 @@ public class MedicineOrderService {
                 NotificationType.MEDICINE_ORDER
         );
 
-
         return mapToResponseDto(savedOrder);
     }
-
 
     // ============================================================
     // CANCEL ORDER
@@ -711,11 +584,6 @@ public class MedicineOrderService {
         MedicineOrder order =
                 getOrder(orderId);
 
-
-        // --------------------------------------------------------
-        // Check patient owns order
-        // --------------------------------------------------------
-
         if (!order.getPatient()
                 .getId()
                 .equals(patientUserId)) {
@@ -725,11 +593,6 @@ public class MedicineOrderService {
             );
         }
 
-
-        // --------------------------------------------------------
-        // Completed cannot be cancelled
-        // --------------------------------------------------------
-
         if (order.getStatus()
                 == MedicineOrderStatus.COMPLETED) {
 
@@ -737,11 +600,6 @@ public class MedicineOrderService {
                     "Completed order cannot be cancelled"
             );
         }
-
-
-        // --------------------------------------------------------
-        // Already cancelled
-        // --------------------------------------------------------
 
         if (order.getStatus()
                 == MedicineOrderStatus.CANCELLED) {
@@ -751,30 +609,14 @@ public class MedicineOrderService {
             );
         }
 
-
-        // --------------------------------------------------------
-        // Restore stock
-        // --------------------------------------------------------
-
         restoreInventoryStock(order);
-
-
-        // --------------------------------------------------------
-        // Change status
-        // --------------------------------------------------------
 
         order.setStatus(
                 MedicineOrderStatus.CANCELLED
         );
 
-
         MedicineOrder savedOrder =
                 medicineOrderRepository.save(order);
-
-
-        // --------------------------------------------------------
-        // Notify pharmacy
-        // --------------------------------------------------------
 
         notificationService.createNotification(
                 order.getPharmacy().getUser().getId(),
@@ -784,10 +626,8 @@ public class MedicineOrderService {
                 NotificationType.MEDICINE_ORDER
         );
 
-
         return mapToResponseDto(savedOrder);
     }
-
 
     // ============================================================
     // RESTORE INVENTORY STOCK
@@ -800,7 +640,6 @@ public class MedicineOrderService {
         List<OrderItem> orderItems =
                 orderItemRepository.findByOrder(order);
 
-
         for (OrderItem orderItem :
                 orderItems) {
 
@@ -812,29 +651,21 @@ public class MedicineOrderService {
                             )
                             .orElse(null);
 
-
-            // Inventory might have been deleted after
-            // the order was created.
-
             if (inventory == null) {
                 continue;
             }
-
 
             int restoredStock =
                     inventory.getStockQuantity()
                             + orderItem.getQuantity();
 
-
             inventory.setStockQuantity(
                     restoredStock
             );
 
-
             inventory.setAvailable(
                     restoredStock > 0
             );
-
 
             pharmacyInventoryRepository.save(
                     inventory
@@ -842,19 +673,44 @@ public class MedicineOrderService {
         }
     }
 
-
     // ============================================================
     // GET ORDER ITEMS
     // ============================================================
 
     @Transactional(readOnly = true)
     public List<OrderItemResponseDto> getOrderItems(
-            Long orderId
+            Long orderId,
+            Long userId,
+            Role role
     ) {
 
         MedicineOrder order =
                 getOrder(orderId);
 
+        if (role == Role.PATIENT &&
+                !order.getPatient().getId().equals(userId)) {
+
+            throw new RuntimeException(
+                    "You are not allowed to view these order items"
+            );
+        }
+
+        if (role == Role.PHARMACY &&
+                !order.getPharmacy().getId().equals(userId)) {
+
+            throw new RuntimeException(
+                    "You are not allowed to view these order items"
+            );
+        }
+
+        if (role != Role.ADMIN &&
+                role != Role.PATIENT &&
+                role != Role.PHARMACY) {
+
+            throw new RuntimeException(
+                    "You are not allowed to view these order items"
+            );
+        }
 
         return orderItemRepository
                 .findByOrder(order)
@@ -862,7 +718,6 @@ public class MedicineOrderService {
                 .map(this::mapOrderItemToResponse)
                 .collect(Collectors.toList());
     }
-
 
     // ============================================================
     // HELPER - GET ORDER
@@ -880,7 +735,6 @@ public class MedicineOrderService {
                         )
                 );
     }
-
 
     // ============================================================
     // HELPER - CHECK PHARMACY ACCESS
@@ -901,7 +755,6 @@ public class MedicineOrderService {
         }
     }
 
-
     // ============================================================
     // MAP ORDER TO RESPONSE
     // ============================================================
@@ -911,26 +764,102 @@ public class MedicineOrderService {
     ) {
 
         Long prescriptionId = null;
+        String prescriptionNotes = null;
 
+        List<OrderMedicineDto> medicines = new java.util.ArrayList<>();
 
         if (order.getPrescription() != null) {
 
             prescriptionId =
                     order.getPrescription().getId();
+
+            prescriptionNotes =
+                    order.getPrescription().getNotes();
+
+            List<PrescriptionItem> prescriptionItems =
+                    prescriptionItemRepository
+                            .findByPrescription(
+                                    order.getPrescription()
+                            );
+
+            for (PrescriptionItem item : prescriptionItems) {
+
+                String medicineName = null;
+
+                if (item.getMedicine() != null) {
+                    medicineName =
+                            item.getMedicine().getName();
+                }
+
+                medicines.add(
+                        OrderMedicineDto.builder()
+                                .medicineId(
+                                        item.getMedicine() != null
+                                                ? item.getMedicine().getId()
+                                                : null
+                                )
+                                .medicineName(medicineName)
+                                .quantity(item.getQuantity())
+                                .dosage(item.getDosage())
+                                .frequency(item.getFrequency())
+                                .duration(item.getDuration())
+                                .instructions(item.getInstructions())
+                                .build()
+                );
+            }
         }
 
-
         return MedicineOrderResponseDto.builder()
+
                 .id(order.getId())
-                .patientId(order.getPatient().getId())
-                .pharmacyId(order.getPharmacy().getId())
+
+                .patientId(
+                        order.getPatient().getId()
+                )
+
+                .pharmacyId(
+                        order.getPharmacy().getId()
+                )
+
                 .prescriptionId(prescriptionId)
-                .status(order.getStatus())
-                .createdAt(order.getCreatedAt())
-                .updatedAt(order.getUpdatedAt())
+
+                .patientName(
+                        order.getPatient()
+                                .getUser()
+                                .getName()
+                )
+
+                .patientPhone(
+                        order.getPatient()
+                                .getUser()
+                                .getPhone()
+                )
+
+                .patientAddress(
+                        order.getPatient()
+                                .getAddress()
+                )
+
+                .prescriptionNotes(
+                        prescriptionNotes
+                )
+
+                .status(
+                        order.getStatus()
+                )
+
+                .createdAt(
+                        order.getCreatedAt()
+                )
+
+                .updatedAt(
+                        order.getUpdatedAt()
+                )
+
+                .medicines(medicines)
+
                 .build();
     }
-
 
     // ============================================================
     // MAP ORDER ITEM TO RESPONSE

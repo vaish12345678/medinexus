@@ -8,9 +8,12 @@ import com.medinexus.user.entity.User;
 import com.medinexus.user.entity.VerificationStatus;
 import com.medinexus.user.repository.DoctorProfileRepository;
 import com.medinexus.user.repository.UserRepository;
-
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 public class DoctorProfileService {
@@ -35,57 +38,76 @@ public class DoctorProfileService {
             Long userId,
             DoctorProfileRequestDto dto) {
 
-        // 1. Find logged-in user
         User user = userRepository.findById(userId)
                 .orElseThrow(() ->
                         new RuntimeException("User not found"));
 
-        // 2. Check whether user is actually a doctor
         if (user.getRole() != Role.DOCTOR) {
             throw new RuntimeException(
                     "Only users with DOCTOR role can create a doctor profile");
         }
 
-        // 3. Check if profile already exists
         if (doctorProfileRepository.existsById(userId)) {
             throw new RuntimeException(
                     "Doctor profile already exists");
         }
 
-        // 4. Create DoctorProfile
-        DoctorProfile profile = DoctorProfile.builder()
-                .id(userId)
-                .user(user)
-                .specialization(dto.getSpecialization())
-                .experienceYears(dto.getExperienceYears())
-                .consultationFee(dto.getConsultationFee())
-                .verificationStatus(VerificationStatus.PENDING)
-                .build();
+        DoctorProfile profile = new DoctorProfile();
 
-        // 5. Save
+        profile.setUser(user);
+        profile.setSpecialization(dto.getSpecialization());
+        profile.setExperienceYears(dto.getExperienceYears());
+        profile.setConsultationFee(dto.getConsultationFee());
+        profile.setQualification(dto.getQualification());
+        profile.setBio(dto.getBio());
+        profile.setVerificationStatus(VerificationStatus.PENDING);
+
         DoctorProfile savedProfile =
                 doctorProfileRepository.save(profile);
 
-        // 6. Convert entity → response DTO
         return mapToResponseDto(savedProfile);
     }
-
 
     // =========================================================
     // GET DOCTOR PROFILE
     // =========================================================
 
+    @Transactional(readOnly = true)
     public DoctorProfileResponseDto getProfile(Long userId) {
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() ->
+                        new RuntimeException("User not found"));
+
+        if (user.getRole() != Role.DOCTOR) {
+            throw new RuntimeException(
+                    "Only doctors can access a doctor profile");
+        }
 
         DoctorProfile profile =
                 doctorProfileRepository.findById(userId)
                         .orElseThrow(() ->
-                                new RuntimeException(
+                                new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND,
                                         "Doctor profile not found"));
 
         return mapToResponseDto(profile);
     }
+    @Transactional(readOnly = true)
+    public List<DoctorProfileResponseDto> getDoctorsBySpecialization(
+            String specialization) {
 
+        List<DoctorProfile> doctors =
+                doctorProfileRepository
+                        .findBySpecializationIgnoreCaseAndVerificationStatus(
+                                specialization,
+                                VerificationStatus.VERIFIED
+                        );
+
+        return doctors.stream()
+                .map(this::mapToResponseDto)
+                .toList();
+    }
 
     // =========================================================
     // UPDATE DOCTOR PROFILE
@@ -96,15 +118,31 @@ public class DoctorProfileService {
             Long userId,
             DoctorProfileRequestDto dto) {
 
+        User user = userRepository.findById(userId)
+                .orElseThrow(() ->
+                        new RuntimeException("User not found"));
+
+        if (user.getRole() != Role.DOCTOR) {
+            throw new RuntimeException(
+                    "Only doctors can update a doctor profile");
+        }
+
         DoctorProfile profile =
                 doctorProfileRepository.findById(userId)
                         .orElseThrow(() ->
                                 new RuntimeException(
                                         "Doctor profile not found"));
 
+        // Doctors can update their professional information
         profile.setSpecialization(dto.getSpecialization());
         profile.setExperienceYears(dto.getExperienceYears());
         profile.setConsultationFee(dto.getConsultationFee());
+        profile.setQualification(dto.getQualification());
+        profile.setBio(dto.getBio());
+
+        // IMPORTANT:
+        // verificationStatus is intentionally NOT changed here.
+        // It is controlled by the doctor-license verification process.
 
         DoctorProfile updatedProfile =
                 doctorProfileRepository.save(profile);
@@ -123,9 +161,18 @@ public class DoctorProfileService {
         return DoctorProfileResponseDto.builder()
                 .id(profile.getId())
                 .userId(profile.getUser().getId())
+
+                .name(profile.getUser().getName())
+                .email(profile.getUser().getEmail())
+                .phone(profile.getUser().getPhone())
+
                 .specialization(profile.getSpecialization())
                 .experienceYears(profile.getExperienceYears())
                 .consultationFee(profile.getConsultationFee())
+
+                .qualification(profile.getQualification())
+                .bio(profile.getBio())
+
                 .verificationStatus(
                         profile.getVerificationStatus())
                 .build();

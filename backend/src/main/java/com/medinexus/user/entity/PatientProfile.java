@@ -1,6 +1,6 @@
 package com.medinexus.user.entity;
 
-import com.medinexus.blood.entity.BloodGroup;
+import com.medinexus.user.entity.BloodGroup;
 import jakarta.persistence.*;
 import lombok.*;
 import jakarta.persistence.Entity;

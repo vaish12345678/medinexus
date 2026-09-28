@@ -58,5 +58,12 @@ public class PharmacyInventory {
 
 
     @Column(nullable = false)
+    private Integer reorderLevel;
+
+    @Column(nullable = false)
+    private Integer reorderQuantity;
+
+
+    @Column(nullable = false)
     private Boolean available;
 }

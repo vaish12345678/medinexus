@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,10 +27,11 @@ public class PrescriptionController {
 
 
     // ============================================================
-    // CREATE PRESCRIPTION - DOCTOR
+    // CREATE PRESCRIPTION - DOCTOR ONLY
     // ============================================================
 
     @PostMapping
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<PrescriptionResponseDto> createPrescription(
             Authentication authentication,
             @Valid @RequestBody PrescriptionRequestDto dto
@@ -50,10 +52,11 @@ public class PrescriptionController {
 
 
     // ============================================================
-    // ADD MEDICINE - DOCTOR
+    // ADD MEDICINE - DOCTOR ONLY
     // ============================================================
 
     @PostMapping("/items")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<PrescriptionItemResponseDto> addMedicine(
             Authentication authentication,
             @Valid @RequestBody PrescriptionItemRequestDto dto
@@ -75,16 +78,26 @@ public class PrescriptionController {
 
     // ============================================================
     // GET PRESCRIPTION BY ID
+    //
+    // Patient -> only their prescription
+    // Doctor  -> only their prescription
+    // Admin   -> any prescription
     // ============================================================
 
     @GetMapping("/{prescriptionId}")
+    @PreAuthorize("hasAnyRole('PATIENT','DOCTOR','ADMIN')")
     public ResponseEntity<PrescriptionResponseDto> getPrescription(
+            Authentication authentication,
             @PathVariable Long prescriptionId
     ) {
 
+        User user = getAuthenticatedUser(authentication);
+
         PrescriptionResponseDto response =
                 prescriptionService.getPrescriptionById(
-                        prescriptionId
+                        prescriptionId,
+                        user.getId(),
+                        user.getRole()
                 );
 
         return ResponseEntity.ok(response);
@@ -93,17 +106,27 @@ public class PrescriptionController {
 
     // ============================================================
     // GET PRESCRIPTION MEDICINES
+    //
+    // Patient -> only medicines from their prescription
+    // Doctor  -> only medicines from their prescription
+    // Admin   -> any prescription medicines
     // ============================================================
 
     @GetMapping("/{prescriptionId}/items")
+    @PreAuthorize("hasAnyRole('PATIENT','DOCTOR','ADMIN')")
     public ResponseEntity<List<PrescriptionItemResponseDto>>
     getPrescriptionItems(
+            Authentication authentication,
             @PathVariable Long prescriptionId
     ) {
 
+        User user = getAuthenticatedUser(authentication);
+
         List<PrescriptionItemResponseDto> items =
                 prescriptionService.getPrescriptionItems(
-                        prescriptionId
+                        prescriptionId,
+                        user.getId(),
+                        user.getRole()
                 );
 
         return ResponseEntity.ok(items);
@@ -111,10 +134,11 @@ public class PrescriptionController {
 
 
     // ============================================================
-    // GET MY PRESCRIPTIONS - PATIENT
+    // GET MY PRESCRIPTIONS - PATIENT ONLY
     // ============================================================
 
     @GetMapping("/my")
+    @PreAuthorize("hasRole('PATIENT')")
     public ResponseEntity<List<PrescriptionResponseDto>>
     getMyPrescriptions(
             Authentication authentication
@@ -132,10 +156,11 @@ public class PrescriptionController {
 
 
     // ============================================================
-    // GET DOCTOR PRESCRIPTIONS
+    // GET DOCTOR PRESCRIPTIONS - DOCTOR ONLY
     // ============================================================
 
     @GetMapping("/doctor")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<List<PrescriptionResponseDto>>
     getDoctorPrescriptions(
             Authentication authentication

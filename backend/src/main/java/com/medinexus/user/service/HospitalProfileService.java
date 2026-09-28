@@ -17,6 +17,8 @@ public class HospitalProfileService {
 
     private final HospitalProfileRepository hospitalRepository;
 
+
+
     @Transactional
     public HospitalProfileResponseDto createHospital(
             HospitalProfileRequestDto dto
@@ -38,7 +40,7 @@ public class HospitalProfileService {
                         )
                         .description(dto.getDescription())
                         .verificationStatus(
-                                VerificationStatus.PENDING
+                                VerificationStatus.VERIFIED
                         )
                         .active(true)
                         .build();
@@ -48,6 +50,10 @@ public class HospitalProfileService {
 
         return mapToResponse(saved);
     }
+
+    // =========================================================
+    // UPDATE HOSPITAL
+    // =========================================================
 
     @Transactional
     public HospitalProfileResponseDto updateHospital(
@@ -65,17 +71,23 @@ public class HospitalProfileService {
         hospital.setEmail(dto.getEmail());
         hospital.setLatitude(dto.getLatitude());
         hospital.setLongitude(dto.getLongitude());
+
         hospital.setEmergencyAvailable(
                 Boolean.TRUE.equals(
                         dto.getEmergencyAvailable()
                 )
         );
+
         hospital.setDescription(dto.getDescription());
 
         return mapToResponse(
                 hospitalRepository.save(hospital)
         );
     }
+
+    // =========================================================
+    // GET HOSPITAL BY ID
+    // =========================================================
 
     @Transactional(readOnly = true)
     public HospitalProfileResponseDto getHospitalById(
@@ -87,6 +99,10 @@ public class HospitalProfileService {
         );
     }
 
+    // =========================================================
+    // GET ACTIVE HOSPITALS
+    // =========================================================
+
     @Transactional(readOnly = true)
     public List<HospitalProfileResponseDto> getActiveHospitals() {
 
@@ -96,6 +112,25 @@ public class HospitalProfileService {
                 .map(this::mapToResponse)
                 .toList();
     }
+
+    // =========================================================
+    // GET ALL HOSPITALS
+    // Admin can see active + inactive hospitals
+    // =========================================================
+
+    @Transactional(readOnly = true)
+    public List<HospitalProfileResponseDto> getAllHospitals() {
+
+        return hospitalRepository
+                .findAll()
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
+    // =========================================================
+    // GET HOSPITALS BY CITY
+    // =========================================================
 
     @Transactional(readOnly = true)
     public List<HospitalProfileResponseDto> getHospitalsByCity(
@@ -109,6 +144,10 @@ public class HospitalProfileService {
                 .toList();
     }
 
+    // =========================================================
+    // GET EMERGENCY HOSPITALS
+    // =========================================================
+
     @Transactional(readOnly = true)
     public List<HospitalProfileResponseDto>
     getEmergencyHospitals() {
@@ -120,27 +159,41 @@ public class HospitalProfileService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
-    public List<HospitalProfileResponseDto>
-    getPendingHospitals() {
-
-        return hospitalRepository
-                .findByVerificationStatus(
-                        VerificationStatus.PENDING
-                )
-                .stream()
-                .map(this::mapToResponse)
-                .toList();
-    }
+    // =========================================================
+    // DEACTIVATE HOSPITAL
+    // =========================================================
 
     @Transactional
-    public HospitalProfileResponseDto verifyHospital(
+    public HospitalProfileResponseDto deactivateHospital(
             Long hospitalId
     ) {
 
         HospitalProfile hospital =
                 getHospital(hospitalId);
 
+        hospital.setActive(false);
+
+        return mapToResponse(
+                hospitalRepository.save(hospital)
+        );
+    }
+
+    // =========================================================
+    // ACTIVATE HOSPITAL
+    // =========================================================
+
+    @Transactional
+    public HospitalProfileResponseDto activateHospital(
+            Long hospitalId
+    ) {
+
+        HospitalProfile hospital =
+                getHospital(hospitalId);
+
+        hospital.setActive(true);
+
+        // Since Admin created the hospital,
+        // keep it verified.
         hospital.setVerificationStatus(
                 VerificationStatus.VERIFIED
         );
@@ -150,48 +203,9 @@ public class HospitalProfileService {
         );
     }
 
-    @Transactional
-    public HospitalProfileResponseDto rejectHospital(
-            Long hospitalId
-    ) {
-
-        HospitalProfile hospital =
-                getHospital(hospitalId);
-
-        hospital.setVerificationStatus(
-                VerificationStatus.REJECTED
-        );
-
-        return mapToResponse(
-                hospitalRepository.save(hospital)
-        );
-    }
-
-    @Transactional
-    public void deactivateHospital(
-            Long hospitalId
-    ) {
-
-        HospitalProfile hospital =
-                getHospital(hospitalId);
-
-        hospital.setActive(false);
-
-        hospitalRepository.save(hospital);
-    }
-
-    @Transactional
-    public void activateHospital(
-            Long hospitalId
-    ) {
-
-        HospitalProfile hospital =
-                getHospital(hospitalId);
-
-        hospital.setActive(true);
-
-        hospitalRepository.save(hospital);
-    }
+    // =========================================================
+    // GET HOSPITAL
+    // =========================================================
 
     private HospitalProfile getHospital(
             Long hospitalId
@@ -205,6 +219,10 @@ public class HospitalProfileService {
                         )
                 );
     }
+
+    // =========================================================
+    // ENTITY → RESPONSE DTO
+    // =========================================================
 
     private HospitalProfileResponseDto mapToResponse(
             HospitalProfile hospital

@@ -10,4 +10,7 @@ public class LoginResponse {
 
     private String token;
     private String message;
+
+    public LoginResponse(String loginSuccessful) {
+    }
 }

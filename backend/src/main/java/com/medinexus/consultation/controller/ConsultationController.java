@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,8 +24,12 @@ public class ConsultationController {
     private final UserRepository userRepository;
 
 
-    // Doctor creates consultation
+    // =========================================================
+    // DOCTOR CREATES CONSULTATION
+    // =========================================================
+
     @PostMapping
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<ConsultationResponseDto> createConsultation(
             Authentication authentication,
             @Valid @RequestBody ConsultationRequestDto dto
@@ -44,23 +49,40 @@ public class ConsultationController {
     }
 
 
-    // Get consultation by ID
+    // =========================================================
+    // GET CONSULTATION BY ID
+    //
+    // Patient -> only their consultation
+    // Doctor  -> only their consultation
+    // Admin   -> any consultation
+    // =========================================================
+
     @GetMapping("/{consultationId}")
+    @PreAuthorize("hasAnyRole('PATIENT','DOCTOR','ADMIN')")
     public ResponseEntity<ConsultationResponseDto> getConsultation(
+            Authentication authentication,
             @PathVariable Long consultationId
     ) {
 
+        User user = getAuthenticatedUser(authentication);
+
         ConsultationResponseDto response =
                 consultationService.getConsultationById(
-                        consultationId
+                        consultationId,
+                        user.getId(),
+                        user.getRole()
                 );
 
         return ResponseEntity.ok(response);
     }
 
 
-    // Patient gets own consultations
+    // =========================================================
+    // PATIENT GETS OWN CONSULTATIONS
+    // =========================================================
+
     @GetMapping("/my")
+    @PreAuthorize("hasRole('PATIENT')")
     public ResponseEntity<List<ConsultationResponseDto>>
     getMyConsultations(
             Authentication authentication
@@ -77,8 +99,12 @@ public class ConsultationController {
     }
 
 
-    // Doctor gets own consultations
+    // =========================================================
+    // DOCTOR GETS OWN CONSULTATIONS
+    // =========================================================
+
     @GetMapping("/doctor")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<List<ConsultationResponseDto>>
     getDoctorConsultations(
             Authentication authentication
@@ -95,8 +121,12 @@ public class ConsultationController {
     }
 
 
-    // Doctor updates consultation
+    // =========================================================
+    // DOCTOR UPDATES CONSULTATION
+    // =========================================================
+
     @PutMapping("/{consultationId}")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<ConsultationResponseDto>
     updateConsultation(
             Authentication authentication,
@@ -117,7 +147,10 @@ public class ConsultationController {
     }
 
 
-    // Get currently authenticated user
+    // =========================================================
+    // GET AUTHENTICATED USER
+    // =========================================================
+
     private User getAuthenticatedUser(
             Authentication authentication
     ) {

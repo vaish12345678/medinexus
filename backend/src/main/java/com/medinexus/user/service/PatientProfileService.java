@@ -7,6 +7,8 @@ import com.medinexus.user.entity.User;
 import com.medinexus.user.repository.PatientProfileRepository;
 import com.medinexus.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
+import com.medinexus.user.entity.Role;
+
 
 @Service
 public class PatientProfileService {
@@ -33,6 +35,9 @@ public class PatientProfileService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() ->
                         new RuntimeException("User not found"));
+        if (user.getRole() != Role.PATIENT) {
+            throw new RuntimeException("Only patients can create a patient profile");
+        }
 
         if (patientProfileRepository.existsById(userId)) {
             throw new RuntimeException("Patient profile already exists");
@@ -56,8 +61,16 @@ public class PatientProfileService {
     // =========================================================
     // GET PATIENT PROFILE
     // =========================================================
-
     public PatientProfileResponseDto getProfile(Long userId) {
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() ->
+                        new RuntimeException("User not found"));
+
+        if (user.getRole() != Role.PATIENT) {
+            throw new RuntimeException(
+                    "Only patients can access a patient profile");
+        }
 
         PatientProfile profile =
                 patientProfileRepository.findById(userId)
@@ -67,8 +80,6 @@ public class PatientProfileService {
 
         return mapToResponseDto(profile);
     }
-
-
     // =========================================================
     // UPDATE PATIENT PROFILE
     // =========================================================
@@ -76,6 +87,15 @@ public class PatientProfileService {
     public PatientProfileResponseDto updateProfile(
             Long userId,
             PatientProfileRequestDto dto) {
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() ->
+                        new RuntimeException("User not found"));
+
+        if (user.getRole() != Role.PATIENT) {
+            throw new RuntimeException(
+                    "Only patients can update a patient profile");
+        }
 
         PatientProfile profile =
                 patientProfileRepository.findById(userId)
@@ -105,10 +125,18 @@ public class PatientProfileService {
         return PatientProfileResponseDto.builder()
                 .id(profile.getId())
                 .userId(profile.getUser().getId())
+
+                // Account information
+                .name(profile.getUser().getName())
+                .email(profile.getUser().getEmail())
+                .phone(profile.getUser().getPhone())
+
+                // Health information
                 .dateOfBirth(profile.getDateOfBirth())
                 .gender(profile.getGender())
                 .bloodGroup(profile.getBloodGroup())
                 .address(profile.getAddress())
+
                 .build();
     }
 }

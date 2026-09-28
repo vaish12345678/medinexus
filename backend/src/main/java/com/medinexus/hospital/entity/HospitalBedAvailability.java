@@ -27,9 +27,23 @@ public class HospitalBedAvailability {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // =========================
+    // HOSPITAL
+    // =========================
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "hospital_id", nullable = false)
     private HospitalProfile hospital;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "department_id", nullable = false)
+    private HospitalDepartment department;
+
+
+
+    // =========================
+    // BED DETAILS
+    // =========================
 
     @Column(name = "bed_type", nullable = false)
     private String bedType;
@@ -43,10 +57,20 @@ public class HospitalBedAvailability {
     @Column(nullable = false)
     private LocalDateTime lastUpdated;
 
+
+    // =========================
+    // CREATE
+    // =========================
+
     @PrePersist
     protected void onCreate() {
         lastUpdated = LocalDateTime.now();
     }
+
+
+    // =========================
+    // UPDATE
+    // =========================
 
     @PreUpdate
     protected void onUpdate() {

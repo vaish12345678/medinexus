@@ -17,6 +17,9 @@ import com.medinexus.user.repository.PatientProfileRepository;
 import com.medinexus.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.access.prepost.PreAuthorize;
+import com.medinexus.notification.entity.NotificationType;
+import com.medinexus.notification.service.NotificationService;
 
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
@@ -31,19 +34,21 @@ public class AppointmentService {
     private final DoctorProfileRepository doctorProfileRepository;
     private final UserRepository userRepository;
     private final DoctorAvailabilityRepository doctorAvailabilityRepository;
+    private final NotificationService notificationService;
 
     public AppointmentService(
             AppointmentRepository appointmentRepository,
             PatientProfileRepository patientProfileRepository,
             DoctorProfileRepository doctorProfileRepository,
             UserRepository userRepository,
-            DoctorAvailabilityRepository doctorAvailabilityRepository
+            DoctorAvailabilityRepository doctorAvailabilityRepository, NotificationService notificationService
     ) {
         this.appointmentRepository = appointmentRepository;
         this.patientProfileRepository = patientProfileRepository;
         this.doctorProfileRepository = doctorProfileRepository;
         this.userRepository = userRepository;
         this.doctorAvailabilityRepository = doctorAvailabilityRepository;
+        this.notificationService = notificationService;
     }
 
     // ============================================================
@@ -132,8 +137,8 @@ public class AppointmentService {
                                         !dto.getAppointmentTime()
                                                 .isBefore(slot.getStartTime())
                                         &&
-                                        !dto.getAppointmentTime()
-                                                .isAfter(slot.getEndTime())
+                                        dto.getAppointmentTime()
+                                                .isBefore(slot.getEndTime())
                         );
 
         if (!withinAvailability) {
@@ -177,6 +182,20 @@ public class AppointmentService {
         // 10. Save appointment
         Appointment savedAppointment =
                 appointmentRepository.save(appointment);
+
+        notificationService.createNotification(
+                appointment.getDoctor().getId(),
+                "New Appointment Request",
+                "Patient "
+                        + appointment.getPatient().getUser().getName()
+                        + " has requested an appointment on "
+                        + appointment.getAppointmentDate()
+                        + " at "
+                        + appointment.getAppointmentTime()
+                        + ".",
+                NotificationType.APPOINTMENT
+        );
+
 
         // 11. Convert entity to response DTO
         return mapToResponseDto(savedAppointment);
@@ -235,19 +254,38 @@ public class AppointmentService {
     // ============================================================
     // GET APPOINTMENT BY ID
     // ============================================================
-
+    @Transactional(readOnly = true)
     public AppointmentResponseDto getAppointmentById(
-            Long appointmentId
+            Long appointmentId,
+            Long userId,
+            Role role
     ) {
 
-        Appointment appointment =
-                appointmentRepository
-                        .findById(appointmentId)
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Appointment not found"
-                                )
-                        );
+        Appointment appointment = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() ->
+                        new RuntimeException("Appointment not found")
+                );
+
+        boolean isPatientOwner =
+                role == Role.PATIENT &&
+                        appointment.getPatient()
+                                .getId()
+                                .equals(userId);
+
+        boolean isDoctorOwner =
+                role == Role.DOCTOR &&
+                        appointment.getDoctor()
+                                .getId()
+                                .equals(userId);
+
+        boolean isAdmin =
+                role == Role.ADMIN;
+
+        if (!isPatientOwner && !isDoctorOwner && !isAdmin) {
+            throw new RuntimeException(
+                    "You are not allowed to view this appointment"
+            );
+        }
 
         return mapToResponseDto(appointment);
     }
@@ -305,6 +343,19 @@ public class AppointmentService {
 
         Appointment updatedAppointment =
                 appointmentRepository.save(appointment);
+        notificationService.createNotification(
+                appointment.getDoctor().getId(),
+                "Appointment Cancelled",
+                "Patient "
+                        + appointment.getPatient().getUser().getName()
+                        + " has cancelled the appointment scheduled for "
+                        + appointment.getAppointmentDate()
+                        + " at "
+                        + appointment.getAppointmentTime()
+                        + ".",
+                NotificationType.APPOINTMENT
+        );
+
 
         return mapToResponseDto(updatedAppointment);
     }
@@ -312,7 +363,6 @@ public class AppointmentService {
     // ============================================================
     // CONFIRM APPOINTMENT - DOCTOR
     // ============================================================
-
     @Transactional
     public AppointmentResponseDto confirmAppointment(
             Long appointmentId,
@@ -338,6 +388,16 @@ public class AppointmentService {
             );
         }
 
+        // Doctor must be verified
+        if (appointment.getDoctor()
+                .getVerificationStatus()
+                != VerificationStatus.VERIFIED) {
+
+            throw new RuntimeException(
+                    "Only a verified doctor can confirm appointments"
+            );
+        }
+
         if (appointment.getStatus()
                 != AppointmentStatus.REQUESTED) {
 
@@ -352,6 +412,19 @@ public class AppointmentService {
 
         Appointment updatedAppointment =
                 appointmentRepository.save(appointment);
+        notificationService.createNotification(
+                appointment.getPatient().getId(),
+                "Appointment Confirmed",
+                "Your appointment with Dr. "
+                        + appointment.getDoctor().getUser().getName()
+                        + " on "
+                        + appointment.getAppointmentDate()
+                        + " at "
+                        + appointment.getAppointmentTime()
+                        + " has been confirmed.",
+                NotificationType.APPOINTMENT
+        );
+
 
         return mapToResponseDto(updatedAppointment);
     }
@@ -359,7 +432,6 @@ public class AppointmentService {
     // ============================================================
     // COMPLETE APPOINTMENT - DOCTOR
     // ============================================================
-
     @Transactional
     public AppointmentResponseDto completeAppointment(
             Long appointmentId,
@@ -385,6 +457,16 @@ public class AppointmentService {
             );
         }
 
+        // Doctor must be verified
+        if (appointment.getDoctor()
+                .getVerificationStatus()
+                != VerificationStatus.VERIFIED) {
+
+            throw new RuntimeException(
+                    "Only a verified doctor can complete appointments"
+            );
+        }
+
         if (appointment.getStatus()
                 != AppointmentStatus.CONFIRMED) {
 
@@ -399,6 +481,15 @@ public class AppointmentService {
 
         Appointment updatedAppointment =
                 appointmentRepository.save(appointment);
+
+        notificationService.createNotification(
+                appointment.getPatient().getId(),
+                "Appointment Completed",
+                "Your appointment with Dr. "
+                        + appointment.getDoctor().getUser().getName()
+                        + " has been completed.",
+                NotificationType.APPOINTMENT
+        );
 
         return mapToResponseDto(updatedAppointment);
     }

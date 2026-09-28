@@ -15,6 +15,10 @@ public class ConsultationResponseDto {
 
     private Long appointmentId;
 
+    private String patientName;
+
+    private Long prescriptionId;
+
     private String notes;
 
     private String diagnosisNotes;

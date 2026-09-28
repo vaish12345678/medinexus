@@ -14,6 +14,7 @@ public class PrescriptionItemResponseDto {
     private Long prescriptionId;
 
     private Long medicineId;
+    private String medicineName;
 
     private String dosage;
 

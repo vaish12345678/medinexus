@@ -12,6 +12,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+
 
 @RestController
 @RequestMapping("/api/patients")
@@ -33,6 +35,7 @@ public class PatientProfileController {
     // =========================================================
 
     @PostMapping("/profile")
+    @PreAuthorize("hasRole('PATIENT')")
     public ResponseEntity<PatientProfileResponseDto> createProfile(
             Authentication authentication,
             @Valid @RequestBody PatientProfileRequestDto dto) {
@@ -59,6 +62,7 @@ public class PatientProfileController {
     // =========================================================
 
     @GetMapping("/profile")
+    @PreAuthorize("hasRole('PATIENT')")
     public ResponseEntity<PatientProfileResponseDto> getProfile(
             Authentication authentication) {
 
@@ -79,6 +83,7 @@ public class PatientProfileController {
     // =========================================================
 
     @PutMapping("/profile")
+    @PreAuthorize("hasRole('PATIENT')")
     public ResponseEntity<PatientProfileResponseDto> updateProfile(
             Authentication authentication,
             @Valid @RequestBody PatientProfileRequestDto dto) {

@@ -2,11 +2,10 @@ package com.medinexus.security;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-
 import lombok.RequiredArgsConstructor;
-
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -19,10 +18,12 @@ import java.io.IOException;
 
 @Component
 @RequiredArgsConstructor
-public class JwtAuthenticationFilter extends OncePerRequestFilter {
+public class JwtAuthenticationFilter
+        extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+
 
     @Override
     protected void doFilterInternal(
@@ -31,35 +32,66 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
-        final String authHeader = request.getHeader("Authorization");
 
-        // No Authorization header
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        // ============================
+        // GET JWT FROM COOKIE
+        // ============================
+
+        String jwt = null;
+
+        Cookie[] cookies = request.getCookies();
+
+        if (cookies != null) {
+
+            for (Cookie cookie : cookies) {
+
+                if ("medinexus_token".equals(cookie.getName())) {
+
+                    jwt = cookie.getValue();
+
+                    break;
+                }
+            }
+        }
+
+
+        // No cookie
+        if (jwt == null || jwt.isEmpty()) {
+
             filterChain.doFilter(request, response);
+
             return;
         }
 
-        // Extract JWT
-        String jwt = authHeader.substring(7);
 
-        // Extract email/username from JWT
         String email;
 
         try {
+
             email = jwtService.extractUsername(jwt);
+
         } catch (Exception e) {
+
             filterChain.doFilter(request, response);
+
             return;
         }
 
-        // Authenticate only if not already authenticated
+
         if (email != null &&
-                SecurityContextHolder.getContext().getAuthentication() == null) {
+                SecurityContextHolder
+                        .getContext()
+                        .getAuthentication() == null) {
 
             UserDetails userDetails =
-                    userDetailsService.loadUserByUsername(email);
+                    userDetailsService
+                            .loadUserByUsername(email);
 
-            if (jwtService.isTokenValid(jwt, userDetails)) {
+
+            if (jwtService.isTokenValid(
+                    jwt,
+                    userDetails
+            )) {
 
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
@@ -73,10 +105,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                 .buildDetails(request)
                 );
 
-                SecurityContextHolder.getContext()
-                        .setAuthentication(authentication);
+                SecurityContextHolder
+                        .getContext()
+                        .setAuthentication(
+                                authentication
+                        );
             }
         }
+
 
         filterChain.doFilter(request, response);
     }

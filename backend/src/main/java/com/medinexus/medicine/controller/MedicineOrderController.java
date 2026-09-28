@@ -4,9 +4,12 @@ import com.medinexus.medicine.dto.MedicineOrderRequestDto;
 import com.medinexus.medicine.dto.MedicineOrderResponseDto;
 import com.medinexus.medicine.dto.OrderItemResponseDto;
 import com.medinexus.medicine.service.MedicineOrderService;
+import com.medinexus.user.entity.User;
+import com.medinexus.user.repository.UserRepository;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,30 +20,37 @@ import java.util.List;
 public class MedicineOrderController {
 
     private final MedicineOrderService medicineOrderService;
+    private final UserRepository userRepository;
 
     public MedicineOrderController(
-            MedicineOrderService medicineOrderService
+            MedicineOrderService medicineOrderService,
+            UserRepository userRepository
     ) {
         this.medicineOrderService = medicineOrderService;
+        this.userRepository = userRepository;
     }
-
 
     // ============================================================
     // PATIENT CREATES ORDER
     // ============================================================
 
     @PostMapping
+    @PreAuthorize("hasRole('PATIENT')")
     public ResponseEntity<MedicineOrderResponseDto> createOrder(
             Authentication authentication,
             @Valid @RequestBody MedicineOrderRequestDto dto
     ) {
 
-        Long patientUserId =
-                Long.parseLong(authentication.getName());
+        String email = authentication.getName();
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Long userId = user.getId();
 
         MedicineOrderResponseDto response =
                 medicineOrderService.createOrder(
-                        patientUserId,
+                        userId,
                         dto
                 );
 
@@ -49,102 +59,125 @@ public class MedicineOrderController {
                 .body(response);
     }
 
-
     // ============================================================
     // PATIENT GETS OWN ORDERS
     // ============================================================
 
     @GetMapping("/my")
-    public ResponseEntity<List<MedicineOrderResponseDto>>
-    getMyOrders(
+    @PreAuthorize("hasRole('PATIENT')")
+    public ResponseEntity<List<MedicineOrderResponseDto>> getMyOrders(
             Authentication authentication
     ) {
 
-        Long patientUserId =
-                Long.parseLong(authentication.getName());
+        String email = authentication.getName();
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Long userId = user.getId();
 
         List<MedicineOrderResponseDto> orders =
-                medicineOrderService.getPatientOrders(
-                        patientUserId
-                );
+                medicineOrderService.getPatientOrders(userId);
 
         return ResponseEntity.ok(orders);
     }
-
 
     // ============================================================
     // PHARMACY GETS ITS ORDERS
     // ============================================================
 
     @GetMapping("/pharmacy")
-    public ResponseEntity<List<MedicineOrderResponseDto>>
-    getPharmacyOrders(
+    @PreAuthorize("hasRole('PHARMACY')")
+    public ResponseEntity<List<MedicineOrderResponseDto>> getPharmacyOrders(
             Authentication authentication
     ) {
 
-        Long pharmacyUserId =
-                Long.parseLong(authentication.getName());
+        String email = authentication.getName();
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Long userId = user.getId();
 
         List<MedicineOrderResponseDto> orders =
-                medicineOrderService.getPharmacyOrders(
-                        pharmacyUserId
-                );
+                medicineOrderService.getPharmacyOrders(userId);
 
         return ResponseEntity.ok(orders);
     }
-
 
     // ============================================================
     // GET ORDER BY ID
     // ============================================================
 
     @GetMapping("/{orderId}")
-    public ResponseEntity<MedicineOrderResponseDto>
-    getOrderById(
+    @PreAuthorize("hasAnyRole('PATIENT','PHARMACY','ADMIN')")
+    public ResponseEntity<MedicineOrderResponseDto> getOrderById(
+            Authentication authentication,
             @PathVariable Long orderId
     ) {
 
+        String email = authentication.getName();
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Long userId = user.getId();
+
         MedicineOrderResponseDto response =
                 medicineOrderService.getOrderById(
-                        orderId
+                        orderId,
+                        userId,
+                        user.getRole()
                 );
 
         return ResponseEntity.ok(response);
     }
-
 
     // ============================================================
     // GET ORDER ITEMS
     // ============================================================
 
     @GetMapping("/{orderId}/items")
-    public ResponseEntity<List<OrderItemResponseDto>>
-    getOrderItems(
+    @PreAuthorize("hasAnyRole('PATIENT','PHARMACY','ADMIN')")
+    public ResponseEntity<List<OrderItemResponseDto>> getOrderItems(
+            Authentication authentication,
             @PathVariable Long orderId
     ) {
 
+        String email = authentication.getName();
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Long userId = user.getId();
+
         List<OrderItemResponseDto> items =
                 medicineOrderService.getOrderItems(
-                        orderId
+                        orderId,
+                        userId,
+                        user.getRole()
                 );
 
         return ResponseEntity.ok(items);
     }
-
 
     // ============================================================
     // PHARMACY ACCEPTS ORDER
     // ============================================================
 
     @PutMapping("/{orderId}/accept")
-    public ResponseEntity<MedicineOrderResponseDto>
-    acceptOrder(
+    @PreAuthorize("hasRole('PHARMACY')")
+    public ResponseEntity<MedicineOrderResponseDto> acceptOrder(
             Authentication authentication,
             @PathVariable Long orderId
     ) {
 
-        Long pharmacyUserId =
-                Long.parseLong(authentication.getName());
+        String email = authentication.getName();
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Long pharmacyUserId = user.getId();
 
         MedicineOrderResponseDto response =
                 medicineOrderService.acceptOrder(
@@ -155,20 +188,23 @@ public class MedicineOrderController {
         return ResponseEntity.ok(response);
     }
 
-
     // ============================================================
     // PHARMACY STARTS PROCESSING
     // ============================================================
 
     @PutMapping("/{orderId}/process")
-    public ResponseEntity<MedicineOrderResponseDto>
-    processOrder(
+    @PreAuthorize("hasRole('PHARMACY')")
+    public ResponseEntity<MedicineOrderResponseDto> processOrder(
             Authentication authentication,
             @PathVariable Long orderId
     ) {
 
-        Long pharmacyUserId =
-                Long.parseLong(authentication.getName());
+        String email = authentication.getName();
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Long pharmacyUserId = user.getId();
 
         MedicineOrderResponseDto response =
                 medicineOrderService.processOrder(
@@ -179,20 +215,23 @@ public class MedicineOrderController {
         return ResponseEntity.ok(response);
     }
 
-
     // ============================================================
     // PHARMACY MARKS ORDER READY
     // ============================================================
 
     @PutMapping("/{orderId}/ready")
-    public ResponseEntity<MedicineOrderResponseDto>
-    markOrderReady(
+    @PreAuthorize("hasRole('PHARMACY')")
+    public ResponseEntity<MedicineOrderResponseDto> markOrderReady(
             Authentication authentication,
             @PathVariable Long orderId
     ) {
 
-        Long pharmacyUserId =
-                Long.parseLong(authentication.getName());
+        String email = authentication.getName();
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Long pharmacyUserId = user.getId();
 
         MedicineOrderResponseDto response =
                 medicineOrderService.markOrderReady(
@@ -203,20 +242,23 @@ public class MedicineOrderController {
         return ResponseEntity.ok(response);
     }
 
-
     // ============================================================
     // PHARMACY COMPLETES ORDER
     // ============================================================
 
     @PutMapping("/{orderId}/complete")
-    public ResponseEntity<MedicineOrderResponseDto>
-    completeOrder(
+    @PreAuthorize("hasRole('PHARMACY')")
+    public ResponseEntity<MedicineOrderResponseDto> completeOrder(
             Authentication authentication,
             @PathVariable Long orderId
     ) {
 
-        Long pharmacyUserId =
-                Long.parseLong(authentication.getName());
+        String email = authentication.getName();
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Long pharmacyUserId = user.getId();
 
         MedicineOrderResponseDto response =
                 medicineOrderService.completeOrder(
@@ -227,25 +269,28 @@ public class MedicineOrderController {
         return ResponseEntity.ok(response);
     }
 
-
     // ============================================================
     // PATIENT CANCELS ORDER
     // ============================================================
 
     @PutMapping("/{orderId}/cancel")
-    public ResponseEntity<MedicineOrderResponseDto>
-    cancelOrder(
+    @PreAuthorize("hasRole('PATIENT')")
+    public ResponseEntity<MedicineOrderResponseDto> cancelOrder(
             Authentication authentication,
             @PathVariable Long orderId
     ) {
 
-        Long patientUserId =
-                Long.parseLong(authentication.getName());
+        String email = authentication.getName();
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Long userId = user.getId();
 
         MedicineOrderResponseDto response =
                 medicineOrderService.cancelOrder(
                         orderId,
-                        patientUserId
+                        userId
                 );
 
         return ResponseEntity.ok(response);
