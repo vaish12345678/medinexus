@@ -5,6 +5,6 @@ public enum NotificationType {
     PRESCRIPTION,
     MEDICINE_ORDER,
     BLOOD_REQUEST,
-    ORGAN_REQUEST,
+    ORGAN_REQUEST,CONSULTATION,
     GENERAL
 }

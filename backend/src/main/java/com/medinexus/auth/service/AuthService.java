@@ -1,13 +1,15 @@
 package com.medinexus.auth.service;
 
-
 import com.medinexus.auth.dto.LoginRequest;
 import com.medinexus.auth.dto.LoginResponse;
 import com.medinexus.auth.dto.RegisterRequest;
 import com.medinexus.auth.dto.RegisterResponse;
 import com.medinexus.security.JwtService;
+import com.medinexus.user.entity.PatientProfile;
+import com.medinexus.user.entity.Role;
 import com.medinexus.user.entity.User;
 import com.medinexus.user.entity.UserStatus;
+import com.medinexus.user.repository.PatientProfileRepository;
 import com.medinexus.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -21,7 +23,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
-
+    private final PatientProfileRepository patientProfileRepository;
 
     public RegisterResponse register(RegisterRequest request) {
 
@@ -44,6 +46,15 @@ public class AuthService {
 
         User savedUser = userRepository.save(user);
 
+        if (savedUser.getRole() == Role.PATIENT) {
+
+            PatientProfile patientProfile = new PatientProfile();
+
+            patientProfile.setUser(savedUser);
+
+            patientProfileRepository.save(patientProfile);
+        }
+
         return RegisterResponse.builder()
                 .id(savedUser.getId())
                 .name(savedUser.getName())
@@ -57,6 +68,7 @@ public class AuthService {
     private UserStatus getInitialStatus(RegisterRequest request) {
 
         return switch (request.getRole()) {
+
             case PATIENT -> UserStatus.ACTIVE;
 
             case DOCTOR,
@@ -66,11 +78,14 @@ public class AuthService {
                  ADMIN -> UserStatus.PENDING;
         };
     }
-    public LoginResponse login(LoginRequest request) {
+
+    public String login(LoginRequest request) {
 
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() ->
-                        new BadCredentialsException("Invalid email or password")
+                        new BadCredentialsException(
+                                "Invalid email or password"
+                        )
                 );
 
         boolean passwordMatches =
@@ -85,12 +100,6 @@ public class AuthService {
             );
         }
 
-        String token = jwtService.generateToken(user.getEmail());
-
-        return new LoginResponse(
-                token,
-                "Login successful"
-        );
+        return jwtService.generateToken(user.getEmail());
     }
-
 }

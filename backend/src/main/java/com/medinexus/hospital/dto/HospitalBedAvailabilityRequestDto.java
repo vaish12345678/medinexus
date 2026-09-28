@@ -12,6 +12,9 @@ import lombok.*;
 @Builder
 public class HospitalBedAvailabilityRequestDto {
 
+    @NotNull(message = "Department is required")
+    private Long departmentId;
+
     @NotBlank(message = "Bed type is required")
     private String bedType;
 

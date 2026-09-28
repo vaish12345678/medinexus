@@ -3,6 +3,8 @@ package com.medinexus.hospital.service;
 import com.medinexus.hospital.dto.HospitalBedAvailabilityRequestDto;
 import com.medinexus.hospital.dto.HospitalBedAvailabilityResponseDto;
 import com.medinexus.hospital.entity.HospitalBedAvailability;
+import com.medinexus.hospital.entity.HospitalDepartment;
+import com.medinexus.hospital.repository.HospitalDepartmentRepository;
 import com.medinexus.user.entity.HospitalProfile;
 import com.medinexus.user.entity.VerificationStatus;
 import com.medinexus.hospital.repository.HospitalBedAvailabilityRepository;
@@ -24,6 +26,8 @@ public class HospitalBedAvailabilityService {
 
     private final HospitalProfileRepository
             hospitalProfileRepository;
+    private final HospitalDepartmentRepository
+            hospitalDepartmentRepository;
 
 
     // =========================
@@ -57,10 +61,23 @@ public class HospitalBedAvailabilityService {
                             + " already exists for this hospital"
             );
         }
-
+        HospitalDepartment department =
+                hospitalDepartmentRepository
+                        .findById(request.getDepartmentId())
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Department not found"
+                                )
+                        );
+        if (!department.getHospital().getId().equals(hospital.getId())) {
+            throw new RuntimeException(
+                    "Department does not belong to this hospital"
+            );
+        }
         HospitalBedAvailability bedAvailability =
                 HospitalBedAvailability.builder()
                         .hospital(hospital)
+                        .department(department)
                         .bedType(bedType)
                         .totalBeds(request.getTotalBeds())
                         .availableBeds(request.getAvailableBeds())
@@ -361,14 +378,16 @@ public class HospitalBedAvailabilityService {
                 .builder()
                 .id(bedAvailability.getId())
                 .hospitalId(
-                        bedAvailability
-                                .getHospital()
-                                .getId()
+                        bedAvailability.getHospital().getId()
                 )
                 .hospitalName(
-                        bedAvailability
-                                .getHospital()
-                                .getHospitalName()
+                        bedAvailability.getHospital().getHospitalName()
+                )
+                .departmentId(
+                        bedAvailability.getDepartment().getId()
+                )
+                .departmentName(
+                        bedAvailability.getDepartment().getName()
                 )
                 .bedType(
                         bedAvailability.getBedType()

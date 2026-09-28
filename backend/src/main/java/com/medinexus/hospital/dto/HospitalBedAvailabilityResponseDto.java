@@ -17,6 +17,10 @@ public class HospitalBedAvailabilityResponseDto {
 
     private String hospitalName;
 
+    private Long departmentId;
+
+    private String departmentName;
+
     private String bedType;
 
     private Integer totalBeds;

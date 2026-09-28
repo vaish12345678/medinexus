@@ -86,6 +86,8 @@ public class PharmacyInventoryService {
         inventory.setMedicine(medicine);
         inventory.setPrice(dto.getPrice());
         inventory.setStockQuantity(dto.getStockQuantity());
+        inventory.setReorderLevel(dto.getReorderLevel());
+        inventory.setReorderQuantity(dto.getReorderQuantity());
 
 
         // Automatically determine availability
@@ -247,6 +249,16 @@ public class PharmacyInventoryService {
         inventory.setMedicine(medicine);
         inventory.setPrice(dto.getPrice());
         inventory.setStockQuantity(dto.getStockQuantity());
+        inventory.setMedicine(medicine);
+        inventory.setPrice(dto.getPrice());
+        inventory.setStockQuantity(dto.getStockQuantity());
+
+        inventory.setReorderLevel(dto.getReorderLevel());
+        inventory.setReorderQuantity(dto.getReorderQuantity());
+
+        inventory.setAvailable(
+                dto.getStockQuantity() > 0
+        );
 
 
         // Automatically update availability
@@ -356,6 +368,9 @@ public class PharmacyInventoryService {
                 .medicineId(
                         inventory.getMedicine().getId()
                 )
+                .medicineName(
+                        inventory.getMedicine().getName()
+                )
                 .price(
                         inventory.getPrice()
                 )
@@ -364,6 +379,12 @@ public class PharmacyInventoryService {
                 )
                 .available(
                         inventory.getAvailable()
+                )
+                .reorderLevel(
+                        inventory.getReorderLevel()
+                )
+                .reorderQuantity(
+                        inventory.getReorderQuantity()
                 )
                 .build();
     }

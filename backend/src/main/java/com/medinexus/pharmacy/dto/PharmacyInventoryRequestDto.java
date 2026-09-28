@@ -4,7 +4,6 @@ import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 import java.math.BigDecimal;
-
 @Getter
 @Setter
 @NoArgsConstructor
@@ -20,6 +19,12 @@ public class PharmacyInventoryRequestDto {
 
     @NotNull(message = "Stock quantity is required")
     private Integer stockQuantity;
+
+    @NotNull(message = "Reorder level is required")
+    private Integer reorderLevel;
+
+    @NotNull(message = "Reorder quantity is required")
+    private Integer reorderQuantity;
 
     @NotNull(message = "Availability status is required")
     private Boolean available;

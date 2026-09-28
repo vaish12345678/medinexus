@@ -72,14 +72,14 @@ public class PharmacyProfileService {
 
 
         // 5. Create pharmacy profile
+
+
         PharmacyProfile pharmacy = new PharmacyProfile();
 
-        pharmacy.setId(userId);
         pharmacy.setUser(user);
         pharmacy.setPharmacyName(dto.getPharmacyName());
         pharmacy.setAddress(dto.getAddress());
         pharmacy.setLicenseUrl(dto.getLicenseUrl());
-
 
         // 6. New pharmacy must be verified by admin
         pharmacy.setVerificationStatus(
@@ -157,106 +157,6 @@ public class PharmacyProfileService {
     }
 
 
-    // ============================================================
-    // ADMIN - GET PENDING PHARMACIES
-    // ============================================================
-
-    @Transactional(readOnly = true)
-    public List<PharmacyProfileResponseDto>
-    getPendingPharmacies() {
-
-        return pharmacyProfileRepository
-                .findByVerificationStatus(
-                        VerificationStatus.PENDING
-                )
-                .stream()
-                .map(this::mapToResponseDto)
-                .toList();
-    }
-
-
-    // ============================================================
-    // ADMIN - VERIFY PHARMACY
-    // ============================================================
-
-    @Transactional
-    public PharmacyProfileResponseDto verifyPharmacy(
-            Long pharmacyId
-    ) {
-
-        PharmacyProfile pharmacy =
-                pharmacyProfileRepository.findById(pharmacyId)
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Pharmacy profile not found"
-                                )
-                        );
-
-
-        // Already verified
-        if (pharmacy.getVerificationStatus()
-                == VerificationStatus.VERIFIED) {
-
-            throw new RuntimeException(
-                    "Pharmacy is already verified"
-            );
-        }
-
-
-        // Change status
-        pharmacy.setVerificationStatus(
-                VerificationStatus.VERIFIED
-        );
-
-
-        PharmacyProfile updated =
-                pharmacyProfileRepository.save(pharmacy);
-
-
-        return mapToResponseDto(updated);
-    }
-
-
-    // ============================================================
-    // ADMIN - REJECT PHARMACY
-    // ============================================================
-
-    @Transactional
-    public PharmacyProfileResponseDto rejectPharmacy(
-            Long pharmacyId
-    ) {
-
-        PharmacyProfile pharmacy =
-                pharmacyProfileRepository.findById(pharmacyId)
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Pharmacy profile not found"
-                                )
-                        );
-
-
-        // Already rejected
-        if (pharmacy.getVerificationStatus()
-                == VerificationStatus.REJECTED) {
-
-            throw new RuntimeException(
-                    "Pharmacy is already rejected"
-            );
-        }
-
-
-        // Change status
-        pharmacy.setVerificationStatus(
-                VerificationStatus.REJECTED
-        );
-
-
-        PharmacyProfile updated =
-                pharmacyProfileRepository.save(pharmacy);
-
-
-        return mapToResponseDto(updated);
-    }
 
 
     // ============================================================

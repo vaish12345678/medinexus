@@ -1,6 +1,6 @@
 package com.medinexus.user.dto;
 
-import com.medinexus.blood.entity.BloodGroup;
+import com.medinexus.user.entity.BloodGroup;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -23,4 +23,7 @@ public class PatientProfileResponseDto {
     private BloodGroup bloodGroup;
 
     private String address;
+    private String name;
+    private String email;
+    private String phone;
 }

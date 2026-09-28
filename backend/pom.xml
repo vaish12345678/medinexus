@@ -72,7 +72,7 @@
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
 			<version>1.18.42</version>
-			<scope>compile</scope>
+
 		</dependency>
 		<!-- Source: https://mvnrepository.com/artifact/jakarta.validation/jakarta.validation-api -->
 		<dependency>
@@ -97,14 +97,9 @@
 		<!-- JJWT Implementation -->
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
-			<artifactId>jjwt-impl</artifactId>2
+			<artifactId>jjwt-impl</artifactId>
 			<version>0.12.6</version>
 			<scope>runtime</scope>
-		</dependency>
-		<dependency>
-			<groupId>com.cloudinary</groupId>
-			<artifactId>cloudinary-http44</artifactId>
-			<version>1.39.0</version>
 		</dependency>
 
 		<!-- JJWT Jackson Parsing -->
@@ -116,13 +111,5 @@
 		</dependency>
 	</dependencies>
 
-	<build>
-		<plugins>
-			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-			</plugin>
-		</plugins>
-	</build>
 
 </project>

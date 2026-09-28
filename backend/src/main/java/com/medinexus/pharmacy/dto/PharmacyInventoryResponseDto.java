@@ -17,9 +17,15 @@ public class PharmacyInventoryResponseDto {
 
     private Long medicineId;
 
+    private String medicineName;
+
     private BigDecimal price;
 
     private Integer stockQuantity;
+
+    private Integer reorderLevel;
+
+    private Integer reorderQuantity;
 
     private Boolean available;
 }

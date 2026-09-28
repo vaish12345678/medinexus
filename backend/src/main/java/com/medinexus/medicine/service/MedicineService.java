@@ -5,6 +5,7 @@ import com.medinexus.medicine.dto.MedicineResponseDto;
 import com.medinexus.medicine.entity.Medicine;
 import com.medinexus.medicine.repository.MedicineRepository;
 import org.springframework.stereotype.Service;
+import com.medinexus.user.entity.Role;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -22,8 +23,13 @@ public class MedicineService {
 
     // Create medicine
     public MedicineResponseDto createMedicine(
-            MedicineRequestDto dto
+            MedicineRequestDto dto,
+             Role role
     ) {
+        if (role != Role.ADMIN) {
+            throw new RuntimeException("Only admin can create medicines");
+        }
+
 
         // Check duplicate medicine
         if (medicineRepository.existsByNameIgnoreCase(dto.getName())) {
@@ -77,8 +83,13 @@ public class MedicineService {
     // Update medicine
     public MedicineResponseDto updateMedicine(
             Long medicineId,
-            MedicineRequestDto dto
+            MedicineRequestDto dto,        Role role
+
+
     ) {
+        if (role != Role.ADMIN) {
+            throw new RuntimeException("Only admin can update medicines");
+        }
 
         Medicine medicine =
                 medicineRepository.findById(medicineId)
@@ -102,8 +113,12 @@ public class MedicineService {
 
     // Delete medicine
     public void deleteMedicine(
-            Long medicineId
+            Long medicineId,
+            Role role
     ) {
+        if (role != Role.ADMIN) {
+            throw new RuntimeException("Only admin can delete medicines");
+        }
 
         Medicine medicine =
                 medicineRepository.findById(medicineId)

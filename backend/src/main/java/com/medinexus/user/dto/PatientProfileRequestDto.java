@@ -1,6 +1,6 @@
 package com.medinexus.user.dto;
 
-import com.medinexus.blood.entity.BloodGroup;
+import com.medinexus.user.entity.BloodGroup;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 

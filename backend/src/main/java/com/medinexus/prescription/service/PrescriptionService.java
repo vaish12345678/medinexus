@@ -14,60 +14,84 @@ import com.medinexus.prescription.entity.Prescription;
 import com.medinexus.prescription.entity.PrescriptionItem;
 import com.medinexus.prescription.repository.PrescriptionItemRepository;
 import com.medinexus.prescription.repository.PrescriptionRepository;
+import com.medinexus.user.entity.Role;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.medinexus.notification.entity.NotificationType;
+import com.medinexus.notification.service.NotificationService;
+
 
 import java.util.List;
 
 @Service
+@Transactional
 public class PrescriptionService {
 
     private final PrescriptionRepository prescriptionRepository;
     private final PrescriptionItemRepository prescriptionItemRepository;
     private final ConsultationRepository consultationRepository;
     private final MedicineRepository medicineRepository;
+    private final NotificationService notificationService;
 
     public PrescriptionService(
             PrescriptionRepository prescriptionRepository,
             PrescriptionItemRepository prescriptionItemRepository,
             ConsultationRepository consultationRepository,
-            MedicineRepository medicineRepository
+            MedicineRepository medicineRepository, NotificationService notificationService
     ) {
         this.prescriptionRepository = prescriptionRepository;
         this.prescriptionItemRepository = prescriptionItemRepository;
         this.consultationRepository = consultationRepository;
         this.medicineRepository = medicineRepository;
+        this.notificationService = notificationService;
     }
 
 
     // ============================================================
     // CREATE PRESCRIPTION
+    // DOCTOR ONLY
     // ============================================================
 
-    @Transactional
     public PrescriptionResponseDto createPrescription(
             Long doctorUserId,
             PrescriptionRequestDto dto
     ) {
 
+        // --------------------------------------------------------
+        // 1. Find consultation
+        // --------------------------------------------------------
+
         Consultation consultation =
-                consultationRepository.findById(dto.getConsultationId())
+                consultationRepository.findById(
+                                dto.getConsultationId()
+                        )
                         .orElseThrow(() ->
                                 new RuntimeException(
                                         "Consultation not found"
                                 )
                         );
 
+
+        // --------------------------------------------------------
+        // 2. Get appointment
+        // --------------------------------------------------------
+
         Appointment appointment =
                 consultation.getAppointment();
 
+
         if (appointment == null) {
+
             throw new RuntimeException(
                     "No appointment is associated with this consultation"
             );
         }
 
-        // Make sure this doctor owns the appointment
+
+        // --------------------------------------------------------
+        // 3. Check doctor ownership
+        // --------------------------------------------------------
+
         if (!appointment.getDoctor()
                 .getId()
                 .equals(doctorUserId)) {
@@ -77,7 +101,11 @@ public class PrescriptionService {
             );
         }
 
-        // Prescription can only be created after consultation
+
+        // --------------------------------------------------------
+        // 4. Appointment must be completed
+        // --------------------------------------------------------
+
         if (appointment.getStatus()
                 != AppointmentStatus.COMPLETED) {
 
@@ -86,9 +114,15 @@ public class PrescriptionService {
             );
         }
 
-        // Only one prescription per consultation
+
+        // --------------------------------------------------------
+        // 5. Only one prescription per consultation
+        // --------------------------------------------------------
+
         if (prescriptionRepository
-                .findByConsultationId(dto.getConsultationId())
+                .findByConsultationId(
+                        dto.getConsultationId()
+                )
                 .isPresent()) {
 
             throw new RuntimeException(
@@ -96,49 +130,85 @@ public class PrescriptionService {
             );
         }
 
-        Prescription prescription = Prescription.builder()
-                .consultation(consultation)
-                .notes(dto.getNotes())
-                .build();
+
+        // --------------------------------------------------------
+        // 6. Create prescription
+        // --------------------------------------------------------
+
+        Prescription prescription =
+                Prescription.builder()
+                        .consultation(consultation)
+                        .notes(dto.getNotes())
+                        .build();
+
 
         Prescription savedPrescription =
-                prescriptionRepository.save(prescription);
+                prescriptionRepository.save(
+                        prescription
+                );
+        notificationService.createNotification(
+                appointment.getPatient().getId(),
+                "New Prescription",
+                "Dr. "
+                        + appointment.getDoctor().getUser().getName()
+                        + " has created a new prescription for you.",
+                NotificationType.PRESCRIPTION
+        );
 
-        return mapToResponseDto(savedPrescription);
+
+        return mapToResponseDto(
+                savedPrescription
+        );
     }
 
 
     // ============================================================
     // ADD MEDICINE TO PRESCRIPTION
+    // DOCTOR ONLY
     // ============================================================
 
-    @Transactional
     public PrescriptionItemResponseDto addMedicineToPrescription(
             Long doctorUserId,
             PrescriptionItemRequestDto dto
     ) {
 
+        // --------------------------------------------------------
+        // 1. Find prescription
+        // --------------------------------------------------------
+
         Prescription prescription =
                 prescriptionRepository.findById(
-                        dto.getPrescriptionId()
-                ).orElseThrow(() ->
-                        new RuntimeException(
-                                "Prescription not found"
+                                dto.getPrescriptionId()
                         )
-                );
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Prescription not found"
+                                )
+                        );
+
+
+        // --------------------------------------------------------
+        // 2. Get appointment
+        // --------------------------------------------------------
 
         Appointment appointment =
                 prescription
                         .getConsultation()
                         .getAppointment();
 
+
         if (appointment == null) {
+
             throw new RuntimeException(
                     "No appointment is associated with this prescription"
             );
         }
 
-        // Make sure this doctor owns the prescription
+
+        // --------------------------------------------------------
+        // 3. Check doctor ownership
+        // --------------------------------------------------------
+
         if (!appointment.getDoctor()
                 .getId()
                 .equals(doctorUserId)) {
@@ -148,66 +218,203 @@ public class PrescriptionService {
             );
         }
 
+
+        // --------------------------------------------------------
+        // 4. Find medicine
+        // --------------------------------------------------------
+
         Medicine medicine =
-                medicineRepository.findById(dto.getMedicineId())
+                medicineRepository.findById(
+                                dto.getMedicineId()
+                        )
                         .orElseThrow(() ->
                                 new RuntimeException(
                                         "Medicine not found"
                                 )
                         );
 
-        PrescriptionItem item = PrescriptionItem.builder()
-                .prescription(prescription)
-                .medicine(medicine)
-                .dosage(dto.getDosage())
-                .frequency(dto.getFrequency())
-                .duration(dto.getDuration())
-                .quantity(dto.getQuantity())
-                .instructions(dto.getInstructions())
-                .build();
+
+        // --------------------------------------------------------
+        // 5. Create prescription item
+        // --------------------------------------------------------
+
+        PrescriptionItem item =
+                PrescriptionItem.builder()
+                        .prescription(prescription)
+                        .medicine(medicine)
+                        .dosage(dto.getDosage())
+                        .frequency(dto.getFrequency())
+                        .duration(dto.getDuration())
+                        .quantity(dto.getQuantity())
+                        .instructions(dto.getInstructions())
+                        .build();
+
 
         PrescriptionItem savedItem =
                 prescriptionItemRepository.save(item);
 
-        return mapItemToResponseDto(savedItem);
+
+        return mapItemToResponseDto(
+                savedItem
+        );
     }
 
 
     // ============================================================
     // GET PRESCRIPTION BY ID
+    //
+    // Patient -> own prescription
+    // Doctor  -> own prescription
+    // Admin   -> any prescription
     // ============================================================
 
+    @Transactional(readOnly = true)
     public PrescriptionResponseDto getPrescriptionById(
-            Long prescriptionId
+            Long prescriptionId,
+            Long userId,
+            Role role
     ) {
 
         Prescription prescription =
-                prescriptionRepository.findById(prescriptionId)
+                prescriptionRepository.findById(
+                                prescriptionId
+                        )
                         .orElseThrow(() ->
                                 new RuntimeException(
                                         "Prescription not found"
                                 )
                         );
 
-        return mapToResponseDto(prescription);
+
+        // --------------------------------------------------------
+        // Check patient ownership
+        // --------------------------------------------------------
+
+        boolean isPatientOwner =
+                role == Role.PATIENT &&
+                        prescription
+                                .getConsultation()
+                                .getAppointment()
+                                .getPatient()
+                                .getId()
+                                .equals(userId);
+
+
+        // --------------------------------------------------------
+        // Check doctor ownership
+        // --------------------------------------------------------
+
+        boolean isDoctorOwner =
+                role == Role.DOCTOR &&
+                        prescription
+                                .getConsultation()
+                                .getAppointment()
+                                .getDoctor()
+                                .getId()
+                                .equals(userId);
+
+
+        // --------------------------------------------------------
+        // Admin can view any prescription
+        // --------------------------------------------------------
+
+        boolean isAdmin =
+                role == Role.ADMIN;
+
+
+        // --------------------------------------------------------
+        // Reject unauthorized access
+        // --------------------------------------------------------
+
+        if (!isPatientOwner &&
+                !isDoctorOwner &&
+                !isAdmin) {
+
+            throw new RuntimeException(
+                    "You are not allowed to view this prescription"
+            );
+        }
+
+
+        return mapToResponseDto(
+                prescription
+        );
     }
 
 
     // ============================================================
     // GET PRESCRIPTION ITEMS
+    //
+    // Same ownership rules as prescription itself
     // ============================================================
 
+    @Transactional(readOnly = true)
     public List<PrescriptionItemResponseDto> getPrescriptionItems(
-            Long prescriptionId
+            Long prescriptionId,
+            Long userId,
+            Role role
     ) {
 
         Prescription prescription =
-                prescriptionRepository.findById(prescriptionId)
+                prescriptionRepository.findById(
+                                prescriptionId
+                        )
                         .orElseThrow(() ->
                                 new RuntimeException(
                                         "Prescription not found"
                                 )
                         );
+
+
+        // --------------------------------------------------------
+        // Check patient ownership
+        // --------------------------------------------------------
+
+        boolean isPatientOwner =
+                role == Role.PATIENT &&
+                        prescription
+                                .getConsultation()
+                                .getAppointment()
+                                .getPatient()
+                                .getId()
+                                .equals(userId);
+
+
+        // --------------------------------------------------------
+        // Check doctor ownership
+        // --------------------------------------------------------
+
+        boolean isDoctorOwner =
+                role == Role.DOCTOR &&
+                        prescription
+                                .getConsultation()
+                                .getAppointment()
+                                .getDoctor()
+                                .getId()
+                                .equals(userId);
+
+
+        // --------------------------------------------------------
+        // Admin can view any prescription items
+        // --------------------------------------------------------
+
+        boolean isAdmin =
+                role == Role.ADMIN;
+
+
+        // --------------------------------------------------------
+        // Reject unauthorized access
+        // --------------------------------------------------------
+
+        if (!isPatientOwner &&
+                !isDoctorOwner &&
+                !isAdmin) {
+
+            throw new RuntimeException(
+                    "You are not allowed to view these prescription items"
+            );
+        }
+
 
         return prescriptionItemRepository
                 .findByPrescription(prescription)
@@ -221,6 +428,7 @@ public class PrescriptionService {
     // GET PATIENT PRESCRIPTIONS
     // ============================================================
 
+    @Transactional(readOnly = true)
     public List<PrescriptionResponseDto> getPatientPrescriptions(
             Long patientUserId
     ) {
@@ -239,6 +447,7 @@ public class PrescriptionService {
     // GET DOCTOR PRESCRIPTIONS
     // ============================================================
 
+    @Transactional(readOnly = true)
     public List<PrescriptionResponseDto> getDoctorPrescriptions(
             Long doctorUserId
     ) {
@@ -254,7 +463,7 @@ public class PrescriptionService {
 
 
     // ============================================================
-    // PRESCRIPTION → RESPONSE DTO
+    // PRESCRIPTION -> RESPONSE DTO
     // ============================================================
 
     private PrescriptionResponseDto mapToResponseDto(
@@ -263,17 +472,27 @@ public class PrescriptionService {
 
         return PrescriptionResponseDto.builder()
                 .id(prescription.getId())
+
                 .consultationId(
-                        prescription.getConsultation().getId()
+                        prescription
+                                .getConsultation()
+                                .getId()
                 )
-                .notes(prescription.getNotes())
-                .createdAt(prescription.getCreatedAt())
+
+                .notes(
+                        prescription.getNotes()
+                )
+
+                .createdAt(
+                        prescription.getCreatedAt()
+                )
+
                 .build();
     }
 
 
     // ============================================================
-    // PRESCRIPTION ITEM → RESPONSE DTO
+    // PRESCRIPTION ITEM -> RESPONSE DTO
     // ============================================================
 
     private PrescriptionItemResponseDto mapItemToResponseDto(
@@ -282,17 +501,38 @@ public class PrescriptionService {
 
         return PrescriptionItemResponseDto.builder()
                 .id(item.getId())
+
                 .prescriptionId(
                         item.getPrescription().getId()
                 )
+
                 .medicineId(
                         item.getMedicine().getId()
                 )
-                .dosage(item.getDosage())
-                .frequency(item.getFrequency())
-                .duration(item.getDuration())
-                .quantity(item.getQuantity())
-                .instructions(item.getInstructions())
+                .medicineName(
+                        item.getMedicine().getName()
+                )
+
+                .dosage(
+                        item.getDosage()
+                )
+
+                .frequency(
+                        item.getFrequency()
+                )
+
+                .duration(
+                        item.getDuration()
+                )
+
+                .quantity(
+                        item.getQuantity()
+                )
+
+                .instructions(
+                        item.getInstructions()
+                )
+
                 .build();
     }
 }

@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,7 +23,14 @@ public class DoctorAvailabilityController {
     private final DoctorAvailabilityService availabilityService;
     private final UserRepository userRepository;
 
+
+    // =========================================================
+    // ADD AVAILABILITY
+    // DOCTOR ONLY
+    // =========================================================
+
     @PostMapping
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<DoctorAvailabilityResponseDto> addAvailability(
             Authentication authentication,
             @Valid @RequestBody DoctorAvailabilityRequestDto dto) {
@@ -39,19 +47,45 @@ public class DoctorAvailabilityController {
                 .status(HttpStatus.CREATED)
                 .body(response);
     }
+    @GetMapping("/{doctorId}")
+    public ResponseEntity<List<DoctorAvailabilityResponseDto>>
+    getDoctorAvailability(
+            @PathVariable Long doctorId) {
+
+        return ResponseEntity.ok(
+                availabilityService.getDoctorAvailability(
+                        doctorId
+                )
+        );
+    }
+
+    // =========================================================
+    // GET MY AVAILABILITY
+    // DOCTOR ONLY
+    // =========================================================
 
     @GetMapping
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<List<DoctorAvailabilityResponseDto>>
     getMyAvailability(Authentication authentication) {
 
         User user = getAuthenticatedUser(authentication);
 
         return ResponseEntity.ok(
-                availabilityService.getMyAvailability(user.getId())
+                availabilityService.getMyAvailability(
+                        user.getId()
+                )
         );
     }
 
+
+    // =========================================================
+    // DELETE AVAILABILITY
+    // DOCTOR ONLY
+    // =========================================================
+
     @DeleteMapping("/{availabilityId}")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<Void> deleteAvailability(
             Authentication authentication,
             @PathVariable Long availabilityId) {
@@ -65,6 +99,11 @@ public class DoctorAvailabilityController {
 
         return ResponseEntity.noContent().build();
     }
+
+
+    // =========================================================
+    // GET AUTHENTICATED USER
+    // =========================================================
 
     private User getAuthenticatedUser(
             Authentication authentication) {
